@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Arena Survivors 3D — الحارس الوحيد</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#05060a;color:#e8eef5;
+  font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;touch-action:none;user-select:none}
+canvas#game{display:block;width:100%;height:100%}
+
+/* ================= HUD ================= */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+.panel{position:absolute;background:rgba(8,11,18,.72);border:1px solid rgba(120,180,255,.18);
+  border-radius:12px;backdrop-filter:blur(6px);box-shadow:0 6px 24px rgba(0,0,0,.5)}
+
+/* --- بطاقة الحارس (NPC) --- */
+#heroCard{top:12px;right:12px;width:250px;padding:10px 12px;border-color:rgba(255,90,90,.45);
+  box-shadow:0 0 22px rgba(255,60,60,.18),0 6px 24px rgba(0,0,0,.5)}
+#heroCard .hName{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#ffd9d9}
+#heroCard .hName .dot{width:8px;height:8px;border-radius:50%;background:#ff4444;box-shadow:0 0 8px #ff4444}
+#heroCard .hName .lv{margin-inline-start:auto;font-size:11px;background:rgba(255,90,90,.18);
+  border:1px solid rgba(255,90,90,.4);color:#ffb3b3;padding:1px 6px;border-radius:999px}
+.bar{height:9px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:6px;border:1px solid rgba(255,255,255,.08)}
+.bar > i{display:block;height:100%;width:100%;border-radius:999px;transition:width .12s linear}
+.bar.hero > i{background:linear-gradient(90deg,#ff3b3b,#ff8a3b)}
+.bar.player > i{background:linear-gradient(90deg,#2ee66b,#27d3ff)}
+.bar.dash > i{background:linear-gradient(90deg,#3da8e0,#8ee6ff)}
+#heroCard .hState{margin-top:6px;font-size:11.5px;color:#9fb3c8;min-height:15px}
+#heroCard .hRespawn{margin-top:5px;font-size:12px;color:#ffd166;font-weight:700;display:none}
+#heroCard.dead{border-color:rgba(255,209,102,.5)}
+#heroCard.dead .hName .dot{background:#ffd166;box-shadow:0 0 8px #ffd166}
+
+/* --- لوحة الإحصائيات --- */
+#stats{top:12px;left:12px;padding:10px 12px;min-width:190px;font-size:12.5px;line-height:1.6}
+#stats .row{display:flex;justify-content:space-between;gap:14px}
+#stats .k{color:#8fa4bb}
+#stats .v{font-weight:700;color:#eaf3ff}
+#stats .v.warn{color:#ff6b6b}
+#stats .v.ok{color:#3adf6e}
+
+/* --- شريط اللاعب --- */
+#playerBar{left:50%;transform:translateX(-50%);bottom:14px;width:min(420px,72vw);padding:8px 10px}
+#playerBar .top{display:flex;align-items:center;gap:8px;font-size:12px;color:#cfe0f0}
+#playerBar .top b{margin-inline-start:auto;font-size:11px;color:#8fa4bb;font-weight:600}
+#playerBar .hpTxt{font-variant-numeric:tabular-nums}
+
+/* --- لافتة الموجة / الإشعارات --- */
+#banner{position:absolute;top:22%;left:50%;transform:translateX(-50%);text-align:center;
+  font-size:30px;font-weight:800;letter-spacing:1px;opacity:0;transition:opacity .35s;
+  text-shadow:0 0 18px rgba(255,80,80,.6);pointer-events:none;white-space:nowrap}
+#toast{position:absolute;bottom:96px;left:50%;transform:translateX(-50%);text-align:center;font-size:14px;
+  background:rgba(8,11,18,.8);border:1px solid rgba(120,180,255,.2);border-radius:10px;padding:8px 14px;
+  opacity:0;transition:opacity .3s;max-width:88vw}
+#dmgFlash{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 35%,rgba(255,0,0,.55) 100%);opacity:0;transition:opacity .18s}
+
+/* --- أزرار اللمس --- */
+#touch{position:absolute;inset:0;display:none}
+#touch.on{display:block}
+#joyZone{position:absolute;left:14px;bottom:14px;width:150px;height:150px;border-radius:50%;
+  background:rgba(255,255,255,.05);border:2px solid rgba(120,180,255,.25);pointer-events:auto}
+#joyStick{position:absolute;left:47px;top:47px;width:56px;height:56px;border-radius:50%;
+  background:rgba(61,168,224,.7);pointer-events:none}
+.tbtn{position:absolute;pointer-events:auto;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:700;border:2px solid rgba(255,255,255,.25);color:#fff}
+#btnAtk{right:20px;bottom:24px;width:96px;height:96px;background:rgba(255,70,70,.72)}
+#btnDash{right:126px;bottom:36px;width:74px;height:74px;background:rgba(61,168,224,.7)}
+#btnJump{right:34px;bottom:128px;width:74px;height:74px;background:rgba(60,70,90,.75)}
+
+/* ================= الشاشات ================= */
+.screen{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 30%,rgba(30,10,20,.75),rgba(3,4,8,.96));padding:18px}
+.screen.on{display:flex}
+.card{width:min(620px,94vw);max-height:92vh;overflow:auto;background:rgba(10,13,20,.95);
+  border:1px solid rgba(255,80,80,.28);border-radius:18px;padding:22px 22px 18px;
+  box-shadow:0 24px 70px rgba(0,0,0,.7),0 0 40px rgba(255,60,60,.08);text-align:center}
+.card h1{font-size:27px;line-height:1.35;background:linear-gradient(90deg,#ff6b6b,#ffd166);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.card h2{font-size:22px;color:#ffd166;margin-bottom:8px}
+.card p{color:#a9bccf;font-size:13.5px;line-height:1.75;margin:8px 0}
+.card .hi{color:#eaf3ff;font-weight:700}
+.btn{margin-top:10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 26px;border-radius:12px;font-size:16px;font-weight:700;color:#0b0d12;cursor:pointer;
+  background:linear-gradient(90deg,#ffd166,#ff8a3b);border:none;box-shadow:0 8px 20px rgba(255,140,60,.28)}
+.btn.sec{background:rgba(255,255,255,.08);color:#e8eef5;border:1px solid rgba(255,255,255,.18);box-shadow:none;
+  font-size:14px;padding:10px 18px}
+.btn:active{transform:translateY(1px)}
+.modePick{margin:14px 0 6px;display:flex;flex-direction:column;gap:10px}
+.modeOpt{display:flex;gap:12px;align-items:flex-start;text-align:start;cursor:pointer;
+  padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03)}
+.modeOpt.sel{border-color:#ff8a3b;background:rgba(255,138,59,.1);box-shadow:0 0 18px rgba(255,138,59,.14)}
+.modeOpt .ttl{font-weight:700;font-size:14.5px;color:#eaf3ff}
+.modeOpt .sub{font-size:12px;color:#9fb3c8;margin-top:3px;line-height:1.6}
+.modeOpt .rd{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.35);flex:0 0 auto;margin-top:2px}
+.modeOpt.sel .rd{border-color:#ff8a3b;background:radial-gradient(circle,#ff8a3b 45%,transparent 48%)}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:12px;font-size:12.5px;color:#a9bccf}
+.keys div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:7px 10px}
+kbd{background:#1b2130;border:1px solid #384559;border-bottom-width:2px;border-radius:6px;padding:1px 6px;font-size:11.5px;color:#dbe6f2}
+.statGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
+.statGrid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px}
+.statGrid b{display:block;font-size:20px;color:#ffd166}
+.statGrid span{font-size:12px;color:#9fb3c8}
+#loading{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:#05060a;gap:14px}
+#loading .ring{width:54px;height:54px;border-radius:50%;border:3px solid rgba(255,255,255,.15);
+  border-top-color:#ff8a3b;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading p{color:#8fa4bb;font-size:14px}
+.hint{font-size:12px;color:#7f93a8;margin-top:12px;line-height:1.7}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- ================= HUD ================= -->
+<div id="hud">
+  <div class="panel" id="heroCard">
+    <div class="hName">
+      <span class="dot"></span>
+      <span>الحارس · Man in Long Sleeves</span>
+      <span class="lv" id="heroLv">مستوى 1</span>
+    </div>
+    <div class="bar hero"><i id="heroHpBar"></i></div>
+    <div class="hState" id="heroState">يتمشى في الساحة…</div>
+    <div class="hRespawn" id="heroRespawn"></div>
+  </div>
+
+  <div class="panel" id="stats">
+    <div class="row"><span class="k">الموجة</span><span class="v" id="sWave">1</span></div>
+    <div class="row"><span class="k">النقاط</span><span class="v" id="sScore">0</span></div>
+    <div class="row"><span class="k">قدماء أحياء</span><span class="v" id="sAlive">0</span></div>
+    <div class="row"><span class="k">قدماء مدفونين</span><span class="v ok" id="sDead">0</span></div>
+    <div class="row"><span class="k">مرات رجوع الحارس</span><span class="v warn" id="sRespawn">0</span></div>
+  </div>
+
+  <div class="panel" id="playerBar">
+    <div class="top">
+      <span>أنت</span>
+      <span class="hpTxt" id="pHpTxt">100 / 100</span>
+      <b id="dashTxt">اندفاع جاهز</b>
+    </div>
+    <div class="bar player"><i id="pHpBar"></i></div>
+    <div class="bar dash" style="height:5px"><i id="pDashBar"></i></div>
+  </div>
+
+  <div id="banner"></div>
+  <div id="toast"></div>
+  <div id="dmgFlash"></div>
+
+  <div id="touch">
+    <div id="joyZone"><div id="joyStick"></div></div>
+    <div class="tbtn" id="btnAtk">⚔️</div>
+    <div class="tbtn" id="btnDash">💨</div>
+    <div class="tbtn" id="btnJump">⬆️</div>
+  </div>
+</div>
+
+<!-- ================= شاشة البداية ================= -->
+<div class="screen on" id="menu">
+  <div class="card">
+    <h1>⚔️ Arena Survivors 3D</h1>
+    <p>الشخصية <span class="hi">«Man in Long Sleeves»</span> راهي مركّبة كـ NPC في الساحة.<br>
+       بقية الـNPC (القدماء) يموتون <span class="hi">نهائيا</span> — هو <span class="hi">الوحيد</span> لي يرجع بعد الموت.</p>
+
+    <div class="modePick">
+      <div class="modeOpt sel" data-mode="new">
+        <span class="rd"></span>
+        <span>
+          <span class="ttl">وضع الإحياء الجديد (الافتراضي)</span>
+          <span class="sub">الحارس فقط يرجع بعد 8 ثواني، وفي كل رجوع يولّي أقوى. الـNPC القدما يبقاو مدفونين للأبد ☠️</span>
+        </span>
+      </div>
+      <div class="modeOpt" data-mode="old">
+        <span class="rd"></span>
+        <span>
+          <span class="ttl">الوضع القديم — الكل يرجع</span>
+          <span class="sub">نفس السلوك القديم: كل الـNPC يرجعو بعد الموت (باش تشوف الفرق).</span>
+        </span>
+      </div>
+    </div>
+
+    <button class="btn" id="btnStart">▶ ابدأ اللعب</button>
+
+    <div class="keys">
+      <div><kbd>WASD</kbd> / الأنالوج ← حركة</div>
+      <div><kbd>Space</kbd> ⬆️ ← قفزة</div>
+      <div><kbd>Shift</kbd> 💨 ← اندفاع</div>
+      <div><kbd>J</kbd> / كليك ⚔️ ← ضربة</div>
+      <div><kbd>سحب الماوس</kbd> ← دوران الكاميرا</div>
+      <div><kbd>عجلة الماوس</kbd> ← تقريب/تبعيد</div>
+      <div><kbd>P</kbd> / <kbd>Esc</kbd> ← إيقاف مؤقت</div>
+    </div>
+    <div class="hint">في الهاتف: الأنالوج على اليسار، وأزرار ⚔️ 💨 ⬆️ على اليمين.</div>
+  </div>
+</div>
+
+<!-- ================= شاشة الإيقاف ================= -->
+<div class="screen" id="pause">
+  <div class="card">
+    <h2>⏸ إيقاف مؤقت</h2>
+    <p>الحارس راهو يستنى فيك…</p>
+    <div class="statGrid">
+      <div><b id="pWave">1</b><span>الموجة</span></div>
+      <div><b id="pScore">0</b><span>النقاط</span></div>
+      <div><b id="pBuried">0</b><span>قدماء مدفونين</span></div>
+      <div><b id="pRespawns">0</b><span>رجوع الحارس</span></div>
+    </div>
+    <button class="btn" id="btnResume">▶ كمّل</button><br>
+    <button class="btn sec" id="btnQuit">إنهاء الجولة</button>
+  </div>
+</div>
+
+<!-- ================= شاشة النهاية ================= -->
+<div class="screen" id="over">
+  <div class="card">
+    <h2 id="overTitle">☠️ سقطت!</h2>
+    <p id="overMsg">الحارس باقي يرجع… جرب مرة أخرى.</p>
+    <div class="statGrid">
+      <div><b id="oScore">0</b><span>النقاط</span></div>
+      <div><b id="oWave">1</b><span>وصلت للموجة</span></div>
+      <div><b id="oBuried">0</b><span>قدماء مدفونين نهائيا</span></div>
+      <div><b id="oRespawns">0</b><span>مرات رجوع الحارس</span></div>
+    </div>
+    <button class="btn" id="btnAgain">↻ لعبة جديدة</button>
+  </div>
+</div>
+
+<div id="loading"><div class="ring"></div><p>جاري تحميل الشخصية (Man in Long Sleeves)…</p></div>
+
+<script type="module">
+  import { start } from './src/main.js';
+  start();
+</script>
+</body>
+</html>

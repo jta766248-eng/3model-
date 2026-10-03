@@ -1,0 +1,13 @@
+{
+  "name": "arena-survivors-3d",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Arena Survivors 3D — لعبة بقاء 3D، شخصية Man in Long Sleeves كـ NPC ترجع بعد الموت (وحيدة)",
+  "scripts": {
+    "start": "node tools/serve.mjs 3000",
+    "serve": "node tools/serve.mjs 3000"
+  },
+  "keywords": ["three.js", "webgl", "game", "npc", "respawn", "glb"],
+  "license": "MIT"
+}
